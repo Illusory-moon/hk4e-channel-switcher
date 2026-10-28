@@ -1,0 +1,10 @@
+# 下载的安装器与解包产物，绝不上传
+*.exe
+*.payload.7z
+bili-launcher/
+payload*/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
