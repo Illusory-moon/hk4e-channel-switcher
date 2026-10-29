@@ -165,6 +165,49 @@ plugin_sdk_version=5.0.4
 
 ---
 
+## 一键切换（可选）
+
+`scripts/switch_channel.py` 会改写 `config.ini` 的渠道字段，然后启动对应的启动器。
+
+**为什么需要它**：游戏安装目录只有一份 `config.ini`，两个启动器抢着用。如果配置停在 B 服（`channel=14`），用官服启动器启动时会先按 B 服去解析 dispatch，弹一次「二级地址解析失败 / Not match region」再自我恢复——不阻塞，但每次都要点一下。先用脚本改好配置再启动，就不会弹了。
+
+```bash
+# 切到官服并启动官服启动器
+python scripts/switch_channel.py official
+
+# 切到 B 服并启动 B 服启动器
+python scripts/switch_channel.py bilibili
+
+# 只改配置，不启动
+python scripts/switch_channel.py official --no-launch
+
+# 先看看会改成什么
+python scripts/switch_channel.py official --dry-run
+```
+
+默认路径按本机布局填写，可用参数覆盖：
+
+```bash
+python scripts/switch_channel.py bilibili \
+  --game-config "D:\Games\Genshin Impact Game\config.ini" \
+  --official-launcher "D:\GenshinOfficial\launcher.exe" \
+  --bilibili-launcher "D:\GenshinBili\launcher.exe"
+```
+
+### 桌面快捷方式
+
+把 `.lnk` 的 target 指向 `python.exe`、参数填 `"<脚本路径>" official`（或 `bilibili`）即可。
+
+图标可以直接用启动器自己生成的那份：
+
+```
+%APPDATA%\miHoYo\HYP\1_1\ico\hk4e_cn.ico
+```
+
+> 这是本地运行时生成的文件，**不要**把它打包进仓库。
+
+---
+
 ## 切回官服
 
 用原官服启动器（`E:\miHoYo Launcher\launcher.exe`）启动即可，它会重新按官服身份初始化配置。
