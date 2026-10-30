@@ -61,6 +61,61 @@ def rewrite(text: str, profile: dict) -> str:
     return "".join(out)
 
 
+def kill_stale_launchers() -> None:
+    """清理"没有窗口"的残留启动器进程。
+
+    米哈游启动器用单实例锁：如果上一次异常退出留下了一个没有窗口的
+    HYP.exe，新启动的实例会把请求转给它然后自己退出，表现就是"点了没反应"。
+    这里只清理确实没有可见窗口的进程，正常开着的启动器不受影响。
+    """
+    if sys.platform != "win32":
+        return
+
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+
+    def has_visible_window(pid: int) -> bool:
+        hits: list[int] = []
+
+        @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        def callback(hwnd, _lparam):
+            if user32.IsWindowVisible(hwnd):
+                owner = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+                if owner.value == pid:
+                    hits.append(hwnd)
+            return True
+
+        user32.EnumWindows(callback, 0)
+        return bool(hits)
+
+    try:
+        listing = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq HYP.exe", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception:  # noqa: BLE001 - best effort only
+        return
+
+    for line in listing.stdout.splitlines():
+        fields = [field.strip('"') for field in line.split('","')]
+        if len(fields) < 2 or not fields[0].lower().startswith("hyp"):
+            continue
+        try:
+            pid = int(fields[1])
+        except ValueError:
+            continue
+        if not has_visible_window(pid):
+            print(f"清理无窗口的残留启动器进程 pid={pid}")
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)],
+                           capture_output=True, check=False)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -105,6 +160,7 @@ def main() -> int:
         print(f"找不到启动器: {launcher}", file=sys.stderr)
         return 1
     print(f"starting {launcher.name} ...")
+    kill_stale_launchers()
     subprocess.Popen([str(launcher)], cwd=str(launcher.parent))
     return 0
 
